@@ -178,6 +178,18 @@ const find = async (db: Db, filter: Filter): Promise<any[]> => {
                         }
                     }
                 }
+                if(field.uniqBy && _.isArray(formattedResult[field.field])){
+                    formattedResult[field.field] = _.uniqBy(
+                        formattedResult[field.field]
+                        .map(i=>{
+                            const stringVal = _.get(i,field.uniqBy, '').toString();
+                            if(!stringVal) return i;
+                            _.set(i,field.uniqBy,stringVal); 
+                            return i;
+                        }
+                    ), 
+                    field.uniqBy);
+                }
             }
             formattedResults.push(formattedResult);
         }
