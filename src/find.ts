@@ -178,17 +178,20 @@ const find = async (db: Db, filter: Filter): Promise<any[]> => {
                         }
                     }
                 }
-                if(field.uniqBy && _.isArray(formattedResult[field.field])){
-                    formattedResult[field.field] = _.uniqBy(
-                        formattedResult[field.field]
-                        .map(i=>{
-                            const stringVal = _.get(i,field.uniqBy, '').toString();
-                            if(!stringVal) return i;
-                            _.set(i,field.uniqBy,stringVal); 
-                            return i;
-                        }
-                    ), 
-                    field.uniqBy);
+                if(typeof field !== "string"){
+                    const uniqField = field.uniqBy;
+                    if(uniqField && _.isArray(formattedResult[field.field])){
+                        formattedResult[field.field] = _.uniqBy(
+                            formattedResult[field.field]
+                            .map((i:any)=>{
+                                const stringVal = _.get(i,uniqField, '').toString();
+                                if(!stringVal) return i;
+                                _.set(i,uniqField,stringVal); 
+                                return i;
+                            }
+                        ), 
+                        field.uniqBy);
+                    }
                 }
             }
             formattedResults.push(formattedResult);
