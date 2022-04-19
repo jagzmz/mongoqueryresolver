@@ -1,5 +1,8 @@
 {
-    "name": "mongoqueryresolver",
+    "name": "@mithyateam/mongoqueryresolver",
+    "publishConfig":{
+	"access": "public"
+    },
     "version": "1.0.27",
     "description": "",
     "main": "bin/src/index.js",
