@@ -158,12 +158,19 @@ const find = async (db: Db, filter: Filter): Promise<any[]> => {
                         });
                         break;
                     case 'referencesMany':
+                        let foreignKeyValues = instance[relation.foreignKey];
+                        if (!foreignKeyValues) {
+                            foreignKeyValues = [];
+                        }
+                        else if(!Array.isArray(foreignKeyValues)){
+                            foreignKeyValues = [foreignKeyValues];
+                        }
                         instance[field] = await find(db, {
                             ...relation.scope,
                             collection: relation.collection,
                             where: {
                                 [relation.primaryKey || '_id']: {
-                                    $in: instance[relation.foreignKey] || [],
+                                    $in: foreignKeyValues
                                 },
                             },
                         });
