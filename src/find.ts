@@ -2,6 +2,19 @@ import Filter from './filter';
 import { Db, ObjectId } from 'mongodb';
 import * as _ from 'lodash';
 
+const isFieldObject = (field: any): field is Record<string, any> => {
+    if (typeof field === 'object') {
+        return true;
+    }
+    return false;
+}
+const isFieldString = (field: any): field is string => {
+    if (typeof field === 'string') {
+        return true;
+    }
+    return false;
+}
+
 const validatePath = (path: string) => {
     if (!path) throw new Error(`field is required`);
     if (!path.includes('.$.') && !path.includes('.')) return;
@@ -74,10 +87,10 @@ const find = async (db: Db, filter: Filter): Promise<any[]> => {
             if (typeof field === 'string') {
                 validatePath(field);
                 projection[field] = 1;
-            } else if (!field.value.includes('$') && !!!field.resolve) {
+            } else if (isFieldString(field.value) && !field.value.includes('$') && !!!field.resolve) {
                 validatePath(field.value);
                 projection[field.value] = 1;
-            } else {
+            } else if (isFieldString(field.value)) {
                 validatePath(field.value);
             }
         }
@@ -162,7 +175,7 @@ const find = async (db: Db, filter: Filter): Promise<any[]> => {
                         if (!foreignKeyValues) {
                             foreignKeyValues = [];
                         }
-                        else if(!Array.isArray(foreignKeyValues)){
+                        else if (!Array.isArray(foreignKeyValues)) {
                             foreignKeyValues = [foreignKeyValues];
                         }
                         instance[field] = await find(db, {
@@ -186,6 +199,7 @@ const find = async (db: Db, filter: Filter): Promise<any[]> => {
             let formattedResult: { [key: string]: any } =
                 filter.includeRemainingFields ? results[index] : {};
             for (let field of filter.fields) {
+
                 if (typeof field == 'string') {
                     formattedResult[field] = results[index][field];
                 } else if (
@@ -193,7 +207,7 @@ const find = async (db: Db, filter: Filter): Promise<any[]> => {
                     typeof field.resolve !== 'undefined'
                 ) {
                     formattedResult[field.field] = field.value;
-                } else if (!field.value.includes('$')) {
+                } else if (isFieldString(field.value) && !field.value.includes('$')) {
                     formattedResult[field.field] = _.get(
                         results[index],
                         field.value,
@@ -206,7 +220,45 @@ const find = async (db: Db, filter: Filter): Promise<any[]> => {
                             lon: location.lon || location.lng || location[1],
                         };
                     }
-                } else {
+                }
+                else if (isFieldObject(field.value) && field.value.op === 'map') {
+                    if (!field.value.input || !field.value.in) {
+                        break;
+                    }
+                    const input = field.value.input as Array<string>;
+                    // Flatten input to key -> value
+                    const inputMap = _.reduce(
+                        input,
+                        (acc, value, key) => {
+                            acc[value] = results[index][value];
+                            return acc;
+                        },
+                        {} as { [key: string]: object },
+                    );
+                    const mappers = field.value.in as Record<string, Record<string, any>>;
+                    const resultsMap = [] as any[];
+                    // This is being made for array of objects
+                    for (const mapper in mappers) {
+                        const mapperDefinition = mappers[mapper];
+                        const toMapValues = inputMap[mapper];
+                        _.map(
+                            toMapValues,
+                            (value) => {
+                                const clonedMapperDefinition = {} as Record<string, any>;
+                                const mapperKeys = Object.keys(mapperDefinition);
+                                for (const key of mapperKeys) {
+                                    const extractedValue = _.get(value, mapperDefinition[key])
+                                    if (extractedValue) {
+                                        clonedMapperDefinition[key] = _.get(value, mapperDefinition[key])
+                                    }
+                                }
+                                resultsMap.push(clonedMapperDefinition);
+                            }
+                        )
+                    }
+                    formattedResult[field.field] = resultsMap;
+                }
+                else if (isFieldString(field.value)) {
                     formattedResult[field.field] = arrayMapper(
                         field.value,
                         results[index],
@@ -249,19 +301,19 @@ const find = async (db: Db, filter: Filter): Promise<any[]> => {
                         }
                     }
                 }
-                if(typeof field !== "string"){
+                if (typeof field !== "string") {
                     const uniqField = field.uniqBy;
-                    if(uniqField && _.isArray(formattedResult[field.field])){
+                    if (uniqField && _.isArray(formattedResult[field.field])) {
                         formattedResult[field.field] = _.uniqBy(
                             formattedResult[field.field]
-                            .map((i:any)=>{
-                                const stringVal = _.get(i,uniqField, '').toString();
-                                if(!stringVal) return i;
-                                _.set(i,uniqField,stringVal); 
-                                return i;
-                            }
-                        ), 
-                        field.uniqBy);
+                                .map((i: any) => {
+                                    const stringVal = _.get(i, uniqField, '').toString();
+                                    if (!stringVal) return i;
+                                    _.set(i, uniqField, stringVal);
+                                    return i;
+                                }
+                                ),
+                            field.uniqBy);
                     }
                 }
             }

@@ -45,7 +45,7 @@ export default interface Filter {
         | string
         | {
               field: string;
-              value: string;
+              value: string | Record<string, unknown>;
               resolve?: boolean;
               makeUnique?: boolean;
               uniqBy?: string;

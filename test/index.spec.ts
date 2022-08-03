@@ -43,7 +43,10 @@ describe('find', function () {
                 _id: index,
                 age: faker.random.number({ min: 5, max: 90 }),
                 phone: faker.phone.phoneNumberFormat(2),
-                email: faker.internet.email()
+                email: faker.internet.email(),
+                address: {
+                    street: faker.address.streetName(),
+                }
             }
             return author;
         });
@@ -282,7 +285,7 @@ describe('find', function () {
         // console.log("results:", JSON.stringify(results));
         results[0].should.have.keys("name", "address", "_id", "books", "authors");
     });
-    
+
     it('should include authors', async function () {
 
         let results = await QueryResolver.filter({
@@ -308,5 +311,62 @@ describe('find', function () {
         // console.log("results:", JSON.stringify(results));
         results[0].should.have.keys("name", "_id", "authorIds", "authors");
     });
+
+
+    it('should include authors & do map operation on value object', async function () {
+
+        let results = await QueryResolver.filter({
+            collection: "Tag",
+            limit: 5,
+            fields: [
+                "name",
+                "_id",
+                "authorIds",
+                {
+                    field: "authors",
+                    value: {
+                        op: "map",
+                        input: [
+                            "authors",
+                            "authors2"
+                        ],
+                        in: {
+                            authors: {
+                                firstName: "firstName",
+                                lastName: "lastName"
+                            },
+                            authors2: {
+                                street: "address.street",
+                                invalidKey: "address.name"
+                            }
+                        }
+                    }
+                }
+            ],
+            include: {
+                authors: {
+                    relation: "referencesMany",
+                    collection: "Author",
+                    foreignKey: "authorIds"
+                },
+                authors2: {
+                    relation: "referencesMany",
+                    collection: "Author",
+                    foreignKey: "authorIds"
+                }
+            }
+        });
+        // console.log("results:", JSON.stringify(results));
+        results[0].should.have.keys("_id", "name", "authorIds", "authors");
+        // Properties firstName and lastName should be present in the result[0].authors[0]
+        results[0].authors[0].should.have.keys("firstName", "lastName");
+
+        // Some of authors should contain property street
+        results[0].authors.some((author:any) => {
+            return author.street;
+        }
+        ).should.be.true;
+    });
+
 
 });
